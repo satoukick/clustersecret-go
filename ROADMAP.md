@@ -135,12 +135,17 @@ clustersecret-go/
 
 ---
 
-## 待完成 🚧
+## 已完成 ✅
 
 ### 阶段 5：删除与 Finalizer 的端到端验证
 
 - [x] Finalizer 添加/移除逻辑已合并进阶段 4
-- [ ] E2E 验证：用 kind 集群验证 ClusterSecret 删除时所有 child Secret 都被清掉
+- [x] E2E 验证：在 docker-desktop 集群上跑通完整流程（创建 ClusterSecret → 多 NS 同步 → 新建 NS 自动匹配 → 删除时 Finalizer 清理 child Secret）
+- [x] 修复 scheme 注册缺失 `metav1.AddToGroupVersion`（cache reflector 转换 `ListOptions` 必需）
+
+---
+
+## 待完成 🚧
 
 ### 阶段 6：可观测性
 
