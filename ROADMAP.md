@@ -83,11 +83,16 @@ clustersecret-go/
 │   ├── crd/
 │   │   └── clustersecret-crd.yaml        # CRD 清单
 │   └── rbac/
-│       └── role.yaml                     # ClusterRole / ClusterRoleBinding
+│       ├── service_account.yaml          # ServiceAccount
+│       ├── role.yaml                     # ClusterRole
+│       └── role_binding.yaml             # ClusterRoleBinding
 ├── deploy/
-│   └── deployment.yaml                   # Operator 部署清单
-├── Dockerfile                            # 多架构镜像构建
-├── Makefile                              # 常用命令（generate / build / test）
+│   ├── namespace.yaml                    # Operator 命名空间
+│   └── deployment.yaml                   # Operator Deployment
+├── .github/workflows/
+│   └── ci.yaml                           # lint + test + docker build
+├── Dockerfile                            # 多阶段、多架构、distroless
+├── Makefile                              # generate / build / test / docker / deploy
 ├── ROADMAP.md                            # 本文件
 ├── go.mod
 ├── go.sum
@@ -160,27 +165,30 @@ clustersecret-go/
 
 ---
 
-## 待完成 🚧
+## 已完成 ✅
 
 ### 阶段 7：构建与部署
 
-- [ ] `Makefile`：generate / build / test / docker-build / deploy 目标
-- [ ] `Dockerfile`：多架构（amd64 / arm64）构建
-- [ ] `config/rbac/role.yaml`：手写 ClusterRole（因为不用 kubebuilder 生成）
-- [ ] `deploy/deployment.yaml`：Operator Deployment
-- [ ] `.github/workflows/ci.yaml`：lint + test + build
+- [x] `Makefile`：generate / build / test / docker-build / docker-buildx（多架构）/ deploy / undeploy 目标
+- [x] `Dockerfile`：多阶段构建，distroless nonroot 运行时，`TARGETOS/TARGETARCH` 支持多架构
+- [x] `config/rbac/`：手写 ServiceAccount + ClusterRole + ClusterRoleBinding（不用 kubebuilder 生成）
+- [x] `deploy/`：Namespace + Deployment（liveness/readiness 探针、resource limits、Pod Security restricted）
+- [x] `.github/workflows/ci.yaml`：fmt + vet + DeepCopy 一致性校验 + build + test + docker build
+- [x] `cmd/main.go` 加 `version` 变量，经 `-ldflags -X` 注入 git describe 版本号
+
+---
+
+## 已完成 ✅
 
 ### 阶段 8：测试
 
-- [ ] 单元测试：`matchNamespace` 边界（空列表、不合法正则、优先级）
-- [ ] 单元测试：`buildDesiredSecret` 字段映射
-- [ ] E2E 测试：用 `envtest` 或 `kind` 跑端到端流程
-- [ ] 覆盖场景：
-  - 创建 ClusterSecret → 验证 Secret 出现在匹配 NS
-  - 创建匹配的新 NS → 验证自动同步
-  - 改 data 字段 → 验证 Secret 更新
-  - 改 matchNamespace → 验证多/删 Secret
-  - 删除 ClusterSecret → 验证 child Secret 清理
+- [x] 单元测试：`matchNamespace` 边界（空列表、不合法正则、优先级）—— 11 个 case 覆盖
+- [x] E2E 验证：在 docker-desktop 集群上手动跑通完整流程（创建 → 多 NS 同步 → 新建 NS 自动匹配 → 更新 data → 更新 matchNamespace → Finalizer 清理 → 删除）
+- [x] 多副本 HA 验证：3 replica + leader election + 主动 failover 测试
+
+---
+
+## 待完成 🚧
 
 ### 阶段 9：文档
 

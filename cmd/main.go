@@ -10,11 +10,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	clustersecretv1 "github.com/satoukick/clustersecret-go/api/v1"
 	"github.com/satoukick/clustersecret-go/internal/controller"
@@ -23,6 +23,9 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrllog.Log.WithName("setup")
+	// version is injected at build time via -ldflags "-X ...cmd.version=...".
+	// Defaults to "dev" for local `go run` / `go build`.
+	version = "dev"
 )
 
 func init() {
@@ -75,7 +78,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	setupLog.Info("starting manager", "version", version)
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

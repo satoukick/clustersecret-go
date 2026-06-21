@@ -1,0 +1,37 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clustersecret-operator
+  labels:
+    app.kubernetes.io/name: clustersecret-operator
+rules:
+# Full CRUD on the ClusterSecret CR itself.
+- apiGroups: ["clustersecret.io"]
+  resources: ["clustersecrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Status subresource — only get/update/patch (never create/delete).
+- apiGroups: ["clustersecret.io"]
+  resources: ["clustersecrets/status"]
+  verbs: ["get", "update", "patch"]
+# Finalizers — only update, to add/remove the cleanup finalizer.
+- apiGroups: ["clustersecret.io"]
+  resources: ["clustersecrets/finalizers"]
+  verbs: ["update"]
+# Child Secrets: created/updated/deleted in every matching namespace.
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Namespaces: listed/watched to compute matchNamespace patterns.
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+# Leases: used by controller-runtime leader election as the distributed lock.
+# Required only when --leader-elect is enabled (the default in deployment.yaml).
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+# Events: controller-runtime uses the event recorder to broadcast
+# leadership changes and other lifecycle events to the namespace.
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
