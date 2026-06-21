@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -19,6 +20,7 @@ import (
 
 	clustersecretv1 "github.com/satoukick/clustersecret-go/api/v1"
 	csk8s "github.com/satoukick/clustersecret-go/internal/kubernetes"
+	csmetrics "github.com/satoukick/clustersecret-go/internal/metrics"
 )
 
 const (
@@ -57,47 +59,68 @@ type ClusterSecretReconciler struct {
 //  7. Update status to reflect the new synced set.
 func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("clustersecret", req.Name)
+	start := time.Now()
+	resultLabel := "success"
+	defer func() {
+		csmetrics.ReconcileTotal.WithLabelValues(resultLabel).Inc()
+		csmetrics.ReconcileDurationSeconds.Observe(time.Since(start).Seconds())
+	}()
 
 	var csec clustersecretv1.ClusterSecret
 	if err := r.Get(ctx, req.NamespacedName, &csec); err != nil {
 		if apierrors.IsNotFound(err) {
+			// Already gone — nothing to observe. Don't count as an error.
 			return ctrl.Result{}, nil
 		}
+		resultLabel = "error"
 		return ctrl.Result{}, fmt.Errorf("get ClusterSecret: %w", err)
 	}
 
 	// Deletion path: clean up children, then drop the finalizer.
 	if !csec.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, log, &csec)
+		res, err := r.reconcileDelete(ctx, log, &csec)
+		if err != nil {
+			resultLabel = "error"
+		} else {
+			resultLabel = "deleted"
+		}
+		return res, err
 	}
 
 	// Ensure finalizer present before we create any children.
 	if !controllerutil.ContainsFinalizer(&csec, clusterSecretFinalizer) {
 		controllerutil.AddFinalizer(&csec, clusterSecretFinalizer)
 		if err := r.Update(ctx, &csec); err != nil {
+			resultLabel = "error"
 			return ctrl.Result{}, fmt.Errorf("add finalizer: %w", err)
 		}
 		// Update will trigger a fresh reconcile; return early.
+		log.V(1).Info("finalizer added")
 		return ctrl.Result{}, nil
 	}
 
 	data, err := r.resolveData(ctx, &csec)
 	if err != nil {
+		resultLabel = "error"
 		log.Error(err, "resolve data failed")
 		return ctrl.Result{}, err
 	}
 
 	matched, err := r.listMatchingNamespaces(ctx, &csec)
 	if err != nil {
+		resultLabel = "error"
 		log.Error(err, "list matching namespaces failed")
 		return ctrl.Result{}, err
 	}
 	matchedSet := stringSet(matched)
 	previouslySynced := stringSet(csec.Status.SyncedNamespaces)
+	removedCount := len(matchedSetDifference(previouslySynced, matchedSet))
 
 	// Sync to all currently-matched namespaces.
 	for _, ns := range matched {
 		if err := r.syncSecretToNamespace(ctx, &csec, ns, data); err != nil {
+			resultLabel = "error"
+			csmetrics.SyncErrorsTotal.WithLabelValues("sync").Inc()
 			log.Error(err, "sync secret failed", "namespace", ns)
 			return ctrl.Result{}, err
 		}
@@ -109,6 +132,8 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			continue
 		}
 		if err := r.deleteSecretFromNamespace(ctx, &csec, ns); err != nil {
+			resultLabel = "error"
+			csmetrics.SyncErrorsTotal.WithLabelValues("cleanup").Inc()
 			log.Error(err, "delete stale secret failed", "namespace", ns)
 			return ctrl.Result{}, err
 		}
@@ -118,11 +143,28 @@ func (r *ClusterSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	sort.Strings(matched)
 	csec.Status.SyncedNamespaces = matched
 	if err := r.Status().Update(ctx, &csec); err != nil {
+		resultLabel = "error"
 		return ctrl.Result{}, fmt.Errorf("update status: %w", err)
 	}
 
-	log.Info("reconciled", "matched", len(matched))
+	// Record the live synced count for alerting / dashboards.
+	csmetrics.SyncedNamespaces.WithLabelValues(csec.Name).Set(float64(len(matched)))
+
+	log.Info("reconciled", "matched", len(matched), "removed", removedCount)
 	return ctrl.Result{}, nil
+}
+
+// matchedSetDifference returns the keys in a that are not in b. Used only to
+// produce a readable "removed" count in the reconcile log without re-running
+// the diff loop.
+func matchedSetDifference(a map[string]struct{}, b map[string]struct{}) map[string]struct{} {
+	out := make(map[string]struct{})
+	for k := range a {
+		if _, ok := b[k]; !ok {
+			out[k] = struct{}{}
+		}
+	}
+	return out
 }
 
 // reconcileDelete cleans up all child Secrets, then removes the finalizer so

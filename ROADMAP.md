@@ -145,17 +145,22 @@ clustersecret-go/
 
 ---
 
-## 待完成 🚧
+## 已完成 ✅
 
 ### 阶段 6：可观测性
 
-- [ ] Prometheus Metrics：
-  - `clustersecret_reconcile_total`（counter，按结果 label）
-  - `clustersecret_reconcile_duration_seconds`（histogram）
-  - `clustersecret_synced_namespaces`（gauge，按 csec 标签）
-  - `clustersecret_sync_errors_total`（counter，按错误类型 label）
-- [ ] 结构化日志：每个 Reconcile 包含 csec 名称、namespace 数量、错误等
-- [ ] 调试日志：namespace 匹配命中/未命中的细节
+- [x] Prometheus Metrics（注册到 controller-runtime 全局 registry，复用 `:8080/metrics`）：
+  - `clustersecret_reconcile_total`（counter，按 result label：success/error/deleted）
+  - `clustersecret_reconcile_duration_seconds`（histogram，按控制器工作时长分桶）
+  - `clustersecret_synced_namespaces`（gauge，按 clustersecret label —— 注意是 Gauge 不是 Counter，数量会随 matchNamespace 变化上下波动）
+  - `clustersecret_sync_errors_total`（counter，按 operation label：sync/cleanup）
+- [x] 结构化日志：Reconcile 入口带 clustersecret 名称，出口带 matched/removed 计数
+- [x] 调试日志：finalizer 添加、namespace 事件入队数量
+- [x] defer 埋点 reconcile 耗时与结果，保证所有退出路径都被观测
+
+---
+
+## 待完成 🚧
 
 ### 阶段 7：构建与部署
 
