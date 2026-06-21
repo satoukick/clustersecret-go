@@ -121,26 +121,26 @@ clustersecret-go/
 - [x] 实现 `SetupWithManager`：使用 `For()` 注册主资源，使用 `Watches()` 注册 Namespace 联动
 - [x] 加上 `+kubebuilder:rbac` 注释标记所需的权限
 
+### 阶段 4：核心 Reconciler 逻辑
+
+- [x] `MatchNamespace(name, include, exclude)` — 正则匹配函数（提取到 `internal/kubernetes/namespace.go`）
+- [x] 单元测试 11 个 case：边界、优先级、非法正则
+- [x] `listMatchingNamespaces` — 列出所有 Namespace 并过滤匹配项，跳过 Terminating 状态
+- [x] `resolveData` — 处理 `Data` 与 `ValueFrom` 两种数据源，互斥校验
+- [x] `syncSecretToNamespace` — 用 `controllerutil.CreateOrUpdate` 保证幂等，加 managed-by label 防误覆盖
+- [x] `deleteSecretFromNamespace` — 只删带有 managed-by label 的 Secret
+- [x] Reconcile 主循环：fetch → 删除分支 → finalizer → resolve → list → sync → cleanup → status
+- [x] Finalizer 双阶段（添加/删除）已就位
+- [x] `findClusterSecretsForNamespace` — Namespace 事件入队所有 ClusterSecret
+
 ---
 
 ## 待完成 🚧
 
-### 阶段 4：核心 Reconciler 逻辑（进行中）
+### 阶段 5：删除与 Finalizer 的端到端验证
 
-- [ ] `matchNamespace(name, include, exclude)` — 正则匹配函数
-- [ ] `listMatchingNamespaces(ctx, csec)` — 查询匹配命名空间列表
-- [ ] `resolveData(ctx, csec)` — 处理 `data` 与 `valueFrom` 两种数据源
-- [ ] `buildDesiredSecret(csec, ns)` — 构造目标 Secret 对象
-- [ ] `syncSecretToNamespace(...)` — 创建或更新 Secret
-- [ ] `deleteSecretFromNamespace(...)` — 删除多余的 Secret
-- [ ] Reconcile 主循环：fetch → 处理删除（finalizer）→ 调和 → 更新 status
-
-### 阶段 5：删除与 Finalizer
-
-- [ ] 添加 finalizer `clustersecret.io/finalizer`
-- [ ] 在 Reconcile 中检测 `DeletionTimestamp`
-- [ ] 执行清理逻辑后移除 finalizer
-- [ ] 测试：删除 ClusterSecret 时所有 child Secret 都被清掉
+- [x] Finalizer 添加/移除逻辑已合并进阶段 4
+- [ ] E2E 验证：用 kind 集群验证 ClusterSecret 删除时所有 child Secret 都被清掉
 
 ### 阶段 6：可观测性
 
