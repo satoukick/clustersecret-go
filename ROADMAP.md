@@ -188,13 +188,13 @@ clustersecret-go/
 
 ---
 
-## 待完成 🚧
+## 已完成 ✅
 
 ### 阶段 9：文档
 
-- [ ] `README.md`：项目介绍、快速开始、API 文档
-- [ ] `docs/architecture.md`：架构图、组件说明
-- [ ] `docs/operator-vs-pykopf.md`：与原 Python/Kopf 版本的设计对比
+- [x] `README.md`：项目介绍、快速开始、部署、监控、HA、开发指南
+- [x] `docs/architecture.md`：架构图、组件说明、数据流、可观测性
+- [x] `docs/operator-vs-pykopf.md`：与原 Python/Kopf 版本的设计对比（状态管理、Schema、Finalizer、生产就绪度等 8 个维度）
 
 ---
 
