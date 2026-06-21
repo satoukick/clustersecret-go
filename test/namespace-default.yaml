@@ -1,0 +1,6 @@
+# 这个 Namespace 不匹配 ^team-.* 模式，用于验证 ClusterSecret
+# 不会同步到不匹配的 Namespace 中。
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default-no-match
